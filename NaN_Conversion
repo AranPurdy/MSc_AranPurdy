@@ -1,0 +1,49 @@
+###Converts 0.0001 --> NaN in an excel file for input into Imputomics 
+import pandas as pd
+import numpy as np
+import os
+
+# Replace 'your_username' with your actual username in the input path.
+input_file_path = "/YOUR/INPUT/FILE/PATH"
+output_file_name = "/YOUR/OUTPUT/FILE/PATH"
+output_file_path = os.path.join(os.path.dirname(input_file_path), output_file_name)
+
+print(f"Attempting to read file from: {input_file_path}")
+
+try:
+    # Read the Excel file into a pandas DataFrame
+    # header=0 assumes the first row is the header. Adjust if your data is different.
+    df = pd.read_excel(input_file_path, header=0)
+    print("File read successfully.")
+
+    # Display the first few rows of the original DataFrame to see its structure
+    print("\nOriginal DataFrame head:")
+    print(df.head())
+
+    # Display some info about original missing values (0.001) if any
+    print(f"\nNumber of 0.001 values before conversion: {(df == 0.001).sum().sum()}")
+
+    # Replace all occurrences of 0.001 with NaN (Not a Number)
+    # The .replace() method is used for this purpose.
+    # inplace=True modifies the DataFrame directly
+    df.replace(0.001, np.nan, inplace=True)
+    print("0.001 values successfully replaced with NaN.")
+
+    # Display the first few rows of the modified DataFrame to verify the changes
+    print("\nModified DataFrame head (with NaNs):")
+    print(df.head())
+
+    # Display some info about NaN values after conversion
+    print(f"\nTotal NaN values after conversion: {df.isnull().sum().sum()}")
+
+
+    # Save the modified DataFrame to a new Excel file
+    # index=False prevents pandas from writing the DataFrame index as a column in the Excel file
+    df.to_excel(output_file_path, index=False)
+    print(f"\nModified data saved successfully to: {output_file_path}")
+
+except FileNotFoundError:
+    print(f"Error: The file was not found at '{input_file_path}'. Please check the path and try again.")
+except Exception as e:
+    print(f"An error occurred: {e}")
+
