@@ -10,7 +10,7 @@ The scripts are intended to be used as follows:
 
 3. Convert missing values to NaN (NaN_Conversion): Many libraries like Pandas and NumPy use NaN for missing values.
 
-4. Manually impute the data (Manual_Impute): Use a subset of the data with low missing % to perform a simple imputation (mean per replicate group) this will be used to compare MVIAs (Missing Value Imputation Algorithms) against this "ground truth" data. T=0 is removed due to high missingness rate (5/5 replicates have missing values).
+4. Manually impute the data (Manual_Impute): Use a subset of the data with low missing % to perform a simple imputation (mean per replicate group) this will be used to compare MVIAs (Missing Value Imputation Algorithms) against this "ground truth" data. T=0 is removed due to high missingness rate (some replicate groups have 5/5 missing values).
 
 5. Generate artificial missingness patterns (Generate_missingness): Will introduce MAR/MNAR/MCAR patterns to the manually imputed data, generating three output files: mcar_data.xlsx, mnar_data.xlsx, mar_data.xlsx
 
