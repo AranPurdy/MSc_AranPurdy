@@ -1,0 +1,162 @@
+import pandas as pd
+import numpy as np
+import os
+import re
+from typing import Union
+
+def introduce_mcar(df: pd.DataFrame, missing_rate: float, target_cols: list) -> pd.DataFrame:
+    """
+    Introduces Missing Completely At Random (MCAR) patterns into the DataFrame.
+    Randomly sets values to NaN.
+
+    Args:
+        df (pd.DataFrame): The input DataFrame (assumed to be complete).
+        missing_rate (float): The proportion of values to be set as missing (e.g., 0.1 for 10%).
+        target_cols (list): List of columns where missingness should be introduced.
+
+    Returns:
+        pd.DataFrame: A new DataFrame with MCAR patterns.
+    """
+    df_mcar = df.copy()
+    if not target_cols:
+        return df_mcar # Return original if no target columns
+
+    for col in target_cols:
+        if pd.api.types.is_numeric_dtype(df_mcar[col]):
+            mask = np.random.rand(len(df_mcar[col])) < missing_rate
+            df_mcar.loc[mask, col] = np.nan
+            
+    return df_mcar
+
+def introduce_mar(df: pd.DataFrame, missing_rate: float, target_cols: list, conditional_col: str) -> pd.DataFrame:
+    """
+    Introduces Missing At Random (MAR) patterns into the DataFrame.
+    Missingness in target_cols depends on the observed values in conditional_col.
+    Specifically, values in target_cols are more likely to be missing if the
+    corresponding value in conditional_col is above its 75th percentile.
+
+    Args:
+        df (pd.DataFrame): The input DataFrame (assumed to be complete).
+        missing_rate (float): The base proportion of values to be set as missing.
+        target_cols (list): List of columns where missingness should be introduced.
+        conditional_col (str): The column whose observed values influence missingness.
+                               Must be a numeric column.
+
+    Returns:
+        pd.DataFrame: A new DataFrame with MAR patterns.
+    """
+    df_mar = df.copy()
+    if conditional_col not in df_mar.columns or not pd.api.types.is_numeric_dtype(df_mar[conditional_col]):
+        return df_mar # Return original if conditional column is problematic
+    if not target_cols:
+        return df_mar # Return original if no target columns
+
+    # Calculate a threshold based on the conditional column (e.g., 75th percentile)
+    if not df_mar[conditional_col].dropna().empty:
+        threshold = df_mar[conditional_col].quantile(0.75)
+    else:
+        return df_mar # Cannot apply MAR without a valid threshold
+
+    high_condition_rows = (df_mar[conditional_col] > threshold).fillna(False)
+
+    for col in target_cols:
+        if col == conditional_col: # Skip if the target column is the conditional column itself for this pattern
+            continue
+        if col not in df_mar.columns or not pd.api.types.is_numeric_dtype(df_mar[col]):
+            continue # Suppress warning for non-numeric/missing target columns
+
+        mask_high_condition = (np.random.rand(len(df_mar)) < (missing_rate * 1.5)) & high_condition_rows
+        mask_low_condition = (np.random.rand(len(df_mar)) < (missing_rate * 0.5)) & ~high_condition_rows
+
+        df_mar.loc[mask_high_condition | mask_low_condition, col] = np.nan
+            
+    return df_mar
+
+def introduce_mnar(df: pd.DataFrame, missing_rate: float, target_cols: list, threshold_percentile: float = 0.25) -> pd.DataFrame:
+    """
+    Introduces Missing Not At Random (MNAR) patterns into the DataFrame.
+    Missingness in a value depends on the value itself. Specifically, values
+    below a certain percentile are more likely to be missing.
+
+    Args:
+        df (pd.DataFrame): The input DataFrame (assumed to be complete).
+        missing_rate (float): The base proportion of values to be set as missing.
+        target_cols (list): List of columns where missingness should be introduced.
+        threshold_percentile (float): Values below this percentile in a column are
+                                      more likely to be missing (e.g., 0.25 for 25th percentile).
+
+    Returns:
+        pd.DataFrame: A new DataFrame with MNAR patterns.
+    """
+    df_mnar = df.copy()
+    if not target_cols:
+        return df_mnar # Return original if no target columns
+
+    for col in target_cols:
+        if col not in df_mnar.columns or not pd.api.types.is_numeric_dtype(df_mnar[col]):
+            continue # Suppress warning for non-numeric/missing target columns
+
+        if not df_mnar[col].dropna().empty:
+            col_threshold = df_mnar[col].quantile(threshold_percentile)
+        else:
+            col_threshold = -np.inf # If column is all NaN (after dropping NaNs), no threshold can be determined.
+
+        below_threshold_mask = (df_mnar[col] < col_threshold).fillna(False)
+
+        mask_below_threshold = (np.random.rand(len(df_mnar)) < (missing_rate * 2)) & below_threshold_mask
+        mask_above_threshold = (np.random.rand(len(df_mnar)) < (missing_rate * 0.5)) & ~below_threshold_mask
+
+        df_mnar.loc[mask_below_threshold | mask_above_threshold, col] = np.nan
+            
+    return df_mnar
+
+
+# --- Main Execution Block ---
+if __name__ == "__main__":
+    input_complete_data_path = "/YOUR/FILE/PATH"
+
+    # Define the base directory (e.g., 'CFPS') where the 'GenerateMissingness' folder will be created
+    base_cfps_dir = os.path.dirname(os.path.dirname(input_complete_data_path))
+    artificial_missingness_dir = os.path.join(base_cfps_dir, "GenerateMissingness")
+    
+    # Ensure the output directory exists
+    os.makedirs(artificial_missingness_dir, exist_ok=True)
+
+    try:
+        df_complete = pd.read_excel(input_complete_data_path, na_values=['', ' ', '-', '#N/A', 'NULL', 'null'])
+    except Exception as e:
+        print(f"Error loading complete data file: {e}")
+        print("Please ensure 'input_complete_data_path' points to your complete and imputed Excel file.")
+        exit()
+
+    numeric_cols = [col for col in df_complete.columns if pd.api.types.is_numeric_dtype(df_complete[col])]
+    
+    if not numeric_cols:
+        print("Error: No numeric columns found in the complete dataset to introduce missingness. Exiting.")
+        exit()
+
+    common_missing_rate = 0.15 # 15% missingness
+
+    # --- Introduce MCAR ---
+    df_mcar = introduce_mcar(df_complete, common_missing_rate, numeric_cols)
+    mcar_output_path = os.path.join(artificial_missingness_dir, "mcar_data.xlsx")
+    df_mcar.to_excel(mcar_output_path, index=False)
+    print(f"MCAR data saved to: '{mcar_output_path}'")
+
+    # --- Introduce MAR ---
+    if len(numeric_cols) > 0:
+        mar_conditional_col = numeric_cols[0]
+        df_mar = introduce_mar(df_complete, common_missing_rate, numeric_cols, mar_conditional_col)
+        mar_output_path = os.path.join(artificial_missingness_dir, "mar_data.xlsx")
+        df_mar.to_excel(mar_output_path, index=False)
+        print(f"MAR data saved to: '{mar_output_path}'")
+    else:
+        # This branch will likely not be hit if numeric_cols is checked above, but good for safety
+        pass 
+
+    # --- Introduce MNAR ---
+    mnar_threshold_percentile = 0.25 # Values below 25th percentile are more likely to be missing
+    df_mnar = introduce_mnar(df_complete, common_missing_rate, numeric_cols, mnar_threshold_percentile)
+    mnar_output_path = os.path.join(artificial_missingness_dir, "mnar_data.xlsx")
+    df_mnar.to_excel(mnar_output_path, index=False)
+    print(f"MNAR data saved to: '{mnar_output_path}'")
