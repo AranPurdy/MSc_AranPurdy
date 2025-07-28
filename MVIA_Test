@@ -1,0 +1,310 @@
+import pandas as pd
+import numpy as np
+import os
+import re
+import matplotlib.pyplot as plt
+import seaborn as sns
+from typing import Dict, Union, Tuple
+
+# --- Configuration ---
+# IMPORTANT: Adjust these paths to your actual file locations
+INPUT_COMPLETE_DATA_PATH = "/PATH/TO/GROUND/TRUTH" # Ground truth data from Manual_Impute
+ARTIFICIAL_MISSINGNESS_DIR = "/PATH/TO/ARTIFICIAL/MISSINGNESS" # Contains mar_data.xlsx, mcar_data.xlsx, mnar_data.xlsx from Generate_Missingness script
+IMPUTOMICS_RESULTS_DIR = "/PATH/TO/Imputomics_Results" # Contains MAR_results.xlsx, MCAR_results.xlsx, MNAR_results.xlsx from imputomics 
+OUTPUT_PLOTS_DIR = os.path.join(ARTIFICIAL_MISSINGNESS_DIR, "MVIA_Performance_Plots") # Output for plots
+
+# Ensure the output directory for plots exists
+os.makedirs(OUTPUT_PLOTS_DIR, exist_ok=True)
+
+# --- Performance Metrics ---
+def calculate_nrmse(true_values: np.ndarray, imputed_values: np.ndarray, original_range: Tuple[float, float]) -> float:
+    """
+    Calculates Normalized Root Mean Squared Error (NRMSE).
+    """
+    if true_values.size == 0 or imputed_values.size == 0:
+        return np.nan
+
+    true_values = true_values.astype(float)
+    imputed_values = imputed_values.astype(float)
+
+    valid_indices = ~np.isnan(true_values) & ~np.isnan(imputed_values)
+    
+    true_values = true_values[valid_indices]
+    imputed_values = imputed_values[valid_indices]
+
+    if true_values.size == 0:
+        return np.nan
+
+    rmse = np.sqrt(np.mean((imputed_values - true_values)**2))
+    data_range = original_range[1] - original_range[0]
+    if data_range == 0:
+        return 0.0
+    return rmse / data_range
+
+def calculate_mae(true_values: np.ndarray, imputed_values: np.ndarray) -> float:
+    """
+    Calculates Mean Absolute Error (MAE).
+    """
+    if true_values.size == 0 or imputed_values.size == 0:
+        return np.nan
+
+    true_values = true_values.astype(float)
+    imputed_values = imputed_values.astype(float)
+
+    valid_indices = ~np.isnan(true_values) & ~np.isnan(imputed_values)
+    
+    true_values = true_values[valid_indices]
+    imputed_values = imputed_values[valid_indices]
+
+    if true_values.size == 0:
+        return np.nan
+
+    return np.mean(np.abs(imputed_values - true_values))
+
+# --- Biological Validity Check ---
+def check_for_negative_values(df_imputed: pd.DataFrame, method_name: str, pattern_type: str) -> int:
+    """
+    Checks for the presence of negative values in the imputed DataFrame.
+    """
+    # Identify numeric columns for the check
+    numeric_cols_for_check = [col for col in df_imputed.columns if pd.api.types.is_numeric_dtype(df_imputed[col])]
+    
+    total_negative_values = 0
+    
+    for col in numeric_cols_for_check:
+        neg_values = df_imputed[col][df_imputed[col] < 0]
+        if not neg_values.empty:
+            total_negative_values += len(neg_values)
+            
+    return total_negative_values
+
+
+# --- Main Script Logic ---
+def main():
+    try:
+        # 1. Load the complete dataset (ground truth)
+        df_true_raw = pd.read_excel(INPUT_COMPLETE_DATA_PATH, na_values=['', ' ', '-', '#N/A', 'NULL', 'null'])
+
+        if df_true_raw.iloc[:, 0].nunique() == len(df_true_raw):
+            df_true = df_true_raw.set_index(df_true_raw.columns[0]).T
+            df_true.columns = [str(col).replace('.', '_').replace(' ', '_') for col in df_true.columns] # Sanitize
+        else:
+            df_true = df_true_raw.copy()
+            df_true.columns = [str(col).replace('.', '_').replace(' ', '_') for col in df_true.columns] # Sanitize
+            
+        # Identify numeric columns for analysis (these are your metabolites)
+        numeric_cols = [col for col in df_true.columns if pd.api.types.is_numeric_dtype(df_true[col])]
+        if not numeric_cols:
+            print("Error: No numeric columns found in the complete dataset for analysis. Exiting.")
+            return
+
+    except FileNotFoundError:
+        print(f"Error: Ground truth file not found at {INPUT_COMPLETE_DATA_PATH}. Please check the path.")
+        return
+    except Exception as e:
+        print(f"Error loading ground truth data: {e}")
+        return
+
+    # Calculate global min/max for NRMSE normalization across all numeric columns of the *ground truth*
+    global_min = df_true[numeric_cols].min().min()
+    global_max = df_true[numeric_cols].max().max()
+    global_range = (global_min, global_max)
+
+    all_results = [] # To store NRMSE/MAE metrics for plotting
+    negative_value_counts = [] # To store negative value counts for plotting
+
+    # Dictionary mapping missingness patterns to their respective Excel files and imputation methods
+    missingness_patterns_config = {
+        "MCAR": {
+            "missing_data_file": "mcar_data.xlsx",
+            "imputed_results_file": "MCAR_results.xlsx",
+            "methods": ["bpca", "eucknn", "missmda em", "ppca", "metabimpute rf"]
+        },
+        "MAR": {
+            "missing_data_file": "mar_data.xlsx",
+            "imputed_results_file": "MAR_results.xlsx",
+            "methods": ["bpca", "missmda em", "ppca", "metabimpute rf", "svd"]
+        },
+        "MNAR": {
+            "missing_data_file": "mnar_data.xlsx",
+            "imputed_results_file": "MNAR_results.xlsx",
+            "methods": ["cm", "halfmin", "metabimpute halfmin", "knn", "metabimpute min", "min"]
+        }
+    }
+
+    for pattern_type, config in missingness_patterns_config.items():
+        missing_data_file_path = os.path.join(ARTIFICIAL_MISSINGNESS_DIR, config["missing_data_file"])
+        imputed_results_file_path = os.path.join(IMPUTOMICS_RESULTS_DIR, config["imputed_results_file"])
+        methods_list = config["methods"]
+
+        if not os.path.exists(missing_data_file_path):
+            print(f"Warning: Missing data file not found for {pattern_type}: {missing_data_file_path}. Skipping.")
+            continue
+        if not os.path.exists(imputed_results_file_path):
+            print(f"Warning: Imputed results file not found for {pattern_type}: {imputed_results_file_path}. Skipping.")
+            continue
+
+        try:
+            # Load the file with artificial missingness to get the NaN locations
+            df_missing_pattern_raw = pd.read_excel(missing_data_file_path, na_values=['', ' ', '-', '#N/A', 'NULL', 'null'])
+            
+            if df_missing_pattern_raw.iloc[:, 0].nunique() == len(df_missing_pattern_raw):
+                df_missing_pattern = df_missing_pattern_raw.set_index(df_missing_pattern_raw.columns[0]).T
+                df_missing_pattern.columns = [str(col).replace('.', '_').replace(' ', '_') for col in df_missing_pattern.columns]
+            else:
+                df_missing_pattern = df_missing_pattern_raw.copy()
+                df_missing_pattern.columns = [str(col).replace('.', '_').replace(' ', '_') for col in df_missing_pattern.columns]
+            
+            # Crucial: Align indices and columns before applying mask
+            common_samples = df_true.index.intersection(df_missing_pattern.index)
+            common_cols = df_true.columns.intersection(df_missing_pattern.columns)
+
+            if len(common_samples) == 0 or len(common_cols) == 0:
+                raise ValueError(f"No common samples or columns found between ground truth and missing pattern data for {pattern_type}.")
+            
+            df_true_aligned = df_true.loc[common_samples, common_cols]
+            df_missing_pattern_aligned = df_missing_pattern.loc[common_samples, common_cols]
+            
+            # Create a boolean mask for NaN locations for numeric columns
+            numeric_cols_aligned = [col for col in numeric_cols if col in common_cols]
+            if not numeric_cols_aligned:
+                raise ValueError(f"No numeric columns common to ground truth and missing pattern data for {pattern_type}. Check column names and data types.")
+
+            is_missing_mask = df_missing_pattern_aligned[numeric_cols_aligned].isna()
+
+            # Load all sheets from the Imputomics results file
+            imputed_results_dfs: Dict[str, pd.DataFrame] = pd.read_excel(imputed_results_file_path, sheet_name=None, na_values=['', ' ', '-', '#N/A', 'NULL', 'null'])
+
+            for method_name in methods_list:
+                actual_sheet_name = None
+                for sheet in imputed_results_dfs.keys():
+                    if method_name.lower().replace(" ", "").replace("_", "").replace(".", "") == sheet.lower().replace(" ", "").replace("_", "").replace(".", ""):
+                        actual_sheet_name = sheet
+                        break
+                
+                if actual_sheet_name is None:
+                    continue
+                
+                df_imputed_raw = imputed_results_dfs[actual_sheet_name]
+
+                # Transpose the imputed dataframe to ensure consistency (samples as rows, metabolites as columns)
+                if df_imputed_raw.iloc[:, 0].nunique() == len(df_imputed_raw):
+                    df_imputed = df_imputed_raw.set_index(df_imputed_raw.columns[0]).T
+                    df_imputed.columns = [str(col).replace('.', '_').replace(' ', '_') for col in df_imputed.columns] # Sanitize
+                else:
+                    df_imputed = df_imputed_raw.copy()
+                    df_imputed.columns = [str(col).replace('.', '_').replace(' ', '_') for col in df_imputed.columns] # Sanitize
+                    
+                # Ensure df_imputed has necessary numeric columns and convert to numeric
+                for col in numeric_cols_aligned:
+                    if col in df_imputed.columns:
+                        df_imputed[col] = pd.to_numeric(df_imputed[col], errors='coerce')
+                    else:
+                        pass # Silently skip if column not found, as per request
+
+                # --- PERFORM BIOLOGICAL VALIDITY CHECK AND COLLECT RESULTS ---
+                df_imputed_aligned_for_check = df_imputed.loc[common_samples, numeric_cols_aligned]
+                total_neg_vals = check_for_negative_values(df_imputed_aligned_for_check, method_name, pattern_type)
+                negative_value_counts.append({
+                    "Missingness Pattern": pattern_type,
+                    "Method": method_name,
+                    "Negative Values": total_neg_vals
+                })
+
+                # Extract True and Imputed Values using the mask
+                true_imputed_values_flat = []
+                predicted_imputed_values_flat = []
+                
+                for col in numeric_cols_aligned:
+                    if col in df_imputed.columns and col in df_true_aligned.columns and col in is_missing_mask.columns:
+                        col_is_missing_mask = is_missing_mask[col]
+                        
+                        true_vals_at_nan_locs = df_true_aligned.loc[col_is_missing_mask, col].values
+                        imputed_vals_at_nan_locs = df_imputed.loc[common_samples, col][col_is_missing_mask].values
+
+                        valid_imputation_pairs = ~np.isnan(true_vals_at_nan_locs) & ~np.isnan(imputed_vals_at_nan_locs)
+                        
+                        true_imputed_values_flat.extend(true_vals_at_nan_locs[valid_imputation_pairs])
+                        predicted_imputed_values_flat.extend(imputed_vals_at_nan_locs[valid_imputation_pairs])
+                
+                true_imputed_values_arr = np.array(true_imputed_values_flat)
+                predicted_imputed_values_arr = np.array(predicted_imputed_values_flat)
+
+                if true_imputed_values_arr.size == 0:
+                    nrmse = np.nan
+                    mae = np.nan
+                else:
+                    nrmse = calculate_nrmse(true_imputed_values_arr, predicted_imputed_values_arr, global_range)
+                    mae = calculate_mae(true_imputed_values_arr, predicted_imputed_values_arr)
+
+                all_results.append({
+                    "Missingness Pattern": pattern_type,
+                    "Method": method_name,
+                    "NRMSE": nrmse,
+                    "MAE": mae
+                })
+
+        except Exception as e:
+            pass # Silently skip pattern if error, as per request
+
+    if not all_results:
+        print("No results collected for plotting. Exiting.")
+        return
+
+    results_df = pd.DataFrame(all_results)
+    
+    # --- Plotting NRMSE and MAE ---
+    sns.set_theme(style="whitegrid")
+    
+    # Bar plot for NRMSE
+    plt.figure(figsize=(16, 8))
+    sns.barplot(data=results_df, x="Method", y="NRMSE", hue="Missingness Pattern", palette="viridis")
+    plt.title("NRMSE of Imputation Methods Across Missingness Patterns (Lower is Better)", fontsize=16)
+    plt.ylabel("NRMSE", fontsize=12)
+    plt.xlabel("Imputation Method", fontsize=12)
+    plt.xticks(rotation=45, ha="right", fontsize=10)
+    plt.yticks(fontsize=10)
+    plt.legend(title="Missingness Type", bbox_to_anchor=(1.05, 1), loc='upper left')
+    plt.tight_layout(rect=[0, 0, 0.95, 1])
+    plot_path_nrmse = os.path.join(OUTPUT_PLOTS_DIR, "nrmse_bar_plot.png")
+    plt.savefig(plot_path_nrmse, dpi=300)
+    plt.close()
+    print(f"NRMSE bar plot saved to: {plot_path_nrmse}")
+
+    # Bar plot for MAE
+    plt.figure(figsize=(16, 8))
+    sns.barplot(data=results_df, x="Method", y="MAE", hue="Missingness Pattern", palette="magma")
+    plt.title("MAE of Imputation Methods Across Missingness Patterns (Lower is Better)", fontsize=16)
+    plt.ylabel("MAE", fontsize=12)
+    plt.xlabel("Imputation Method", fontsize=12)
+    plt.xticks(rotation=45, ha="right", fontsize=10)
+    plt.yticks(fontsize=10)
+    plt.legend(title="Missingness Type", bbox_to_anchor=(1.05, 1), loc='upper left')
+    plt.tight_layout(rect=[0, 0, 0.95, 1])
+    plot_path_mae = os.path.join(OUTPUT_PLOTS_DIR, "mae_bar_plot.png")
+    plt.savefig(plot_path_mae, dpi=300)
+    plt.close()
+    print(f"MAE bar plot saved to: {plot_path_mae}")
+
+    # --- Plotting Negative Values ---
+    if negative_value_counts:
+        negative_values_df = pd.DataFrame(negative_value_counts)
+
+        plt.figure(figsize=(16, 8))
+        sns.barplot(data=negative_values_df, x="Method", y="Negative Values", hue="Missingness Pattern", palette="coolwarm")
+        plt.title("Count of Negative Values in Imputed Data (Lower is Better)", fontsize=16)
+        plt.ylabel("Number of Negative Values", fontsize=12)
+        plt.xlabel("Imputation Method", fontsize=12)
+        plt.xticks(rotation=45, ha="right", fontsize=10)
+        plt.yticks(fontsize=10)
+        plt.legend(title="Missingness Type", bbox_to_anchor=(1.05, 1), loc='upper left')
+        plt.tight_layout(rect=[0, 0, 0.95, 1])
+        plot_path_neg_values = os.path.join(OUTPUT_PLOTS_DIR, "negative_values_bar_plot.png")
+        plt.savefig(plot_path_neg_values, dpi=300)
+        plt.close()
+        print(f"Negative values bar plot saved to: {plot_path_neg_values}")
+    else:
+        pass # Silently skip if no negative values data to plot
+
+if __name__ == "__main__":
+    main()
