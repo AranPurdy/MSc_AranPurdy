@@ -1,0 +1,87 @@
+### Transposes dataframe (metabolites as columns, samples as rows), converts missing values to NaN, performs Little's MCAR Test using Pyampute
+import pandas as pd
+import numpy as np
+from pyampute.exploration.mcar_statistical_tests import MCARTest
+import os
+
+def perform_littles_mcar_test_pyampute(file_path: str):
+    """
+    Performs Little's MCAR test using the pyampute library.
+
+    Args:
+        file_path (str): The full path to the input Excel file.
+    """
+    print(f"--- Performing Little's MCAR Test on: {file_path} ---")
+
+    if not os.path.exists(file_path):
+        print(f"Error: File not found at '{file_path}'. Please ensure the path is correct.")
+        return
+
+    try:
+        # Load the Excel file, ensuring empty cells are treated as NaN.
+        df = pd.read_excel(file_path, na_values=['', ' ', '-', '#N/A', 'NULL', 'null', 'NA', 'N/A', '0.0001'])
+        print(f"Successfully loaded data. Initial shape: {df.shape}")
+
+        # --- IMPORTANT: Transpose the DataFrame if samples are columns and metabolites are rows ---
+        # Assuming the first column ('Name') contains metabolite identifiers and should become the new index.
+        # If your first column is NOT a unique identifier for metabolites, adjust this.
+        if df.iloc[:, 0].nunique() == len(df): # Check if first column has unique values (like an identifier)
+            df = df.set_index(df.columns[0]) # Set the first column as index
+            print(f"Set '{df.index.name}' as index. New shape: {df.shape}")
+        else:
+            print("Warning: First column does not appear to be a unique identifier. Skipping setting as index before transpose.")
+            # If the first column is not an identifier, pandas will create a default numeric index,
+            # and after transpose, your original 'Name' column will become a row of headers.
+            # You might need to handle this manually later if it's not ideal.
+
+        df = df.T # Transpose the DataFrame
+        print(f"DataFrame transposed. New shape (samples as rows, metabolites as columns): {df.shape}")
+        # --- End of Transposition Block ---
+
+        # Convert all relevant columns to numeric, coercing errors to NaN
+        df_numeric = df.apply(pd.to_numeric, errors='coerce')
+
+        # Select only truly numeric columns for the test
+        numeric_cols = df_numeric.select_dtypes(include=np.number).columns.tolist()
+        df_numeric = df_numeric[numeric_cols].copy()
+
+        if not numeric_cols:
+            print("No suitable numeric columns found for analysis. Exiting.")
+            return
+
+        if df_numeric.isnull().sum().sum() == 0:
+            print("No missing values found in numeric columns. Little's MCAR test cannot be performed (data is complete).")
+            return
+
+        # Initialize the MCARTest object
+        mcar_test_obj = MCARTest(method="little")
+
+        # Perform Little's MCAR test
+        # The little_mcar_test method expects a DataFrame as input
+        p_value = mcar_test_obj.little_mcar_test(df_numeric)
+
+        print(f"\n--- Little's MCAR Test Results ---")
+        print(f"P-value: {p_value:.4f}")
+
+        alpha = 0.05 # Common significance level
+
+        print("\nInterpretation:")
+        if p_value > alpha:
+            print(f"Since p-value ({p_value:.4f}) > alpha ({alpha}), we FAIL TO REJECT the null hypothesis.")
+            print("There is NOT enough statistical evidence to suggest that the data are NOT Missing Completely At Random (MCAR).")
+        else:
+            print(f"Since p-value ({p_value:.4f}) <= alpha ({alpha}), we REJECT the null hypothesis.")
+            print("There is statistical evidence to suggest that the data are NOT Missing Completely At Random (MCAR).")
+            print("This indicates that the missingness mechanism is likely Missing At Random (MAR) or Missing Not At Random (MNAR).")
+
+    except Exception as e:
+        print(f"\nAn unexpected error occurred during analysis: {e}")
+        print(f"Error type: {type(e).__name__}")
+        print("Please check your data format, column names, and ensure the file contains sufficient numeric data with missing values.")
+    finally:
+        print("\n--- Little's MCAR Test Finished ---")
+
+# --- Example Usage ---
+if __name__ == "__main__":
+    input_file = "YOUR/INPUT/FILE/PATH"
+    perform_littles_mcar_test_pyampute(input_file)
