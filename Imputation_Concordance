@@ -1,0 +1,540 @@
+import pandas as pd
+import numpy as np
+from sklearn.decomposition import PCA
+from sklearn.preprocessing import StandardScaler
+import matplotlib.pyplot as plt
+import seaborn as sns
+from pathlib import Path
+from scipy.stats import pearsonr, linregress
+import warnings
+
+# Suppress warnings for cleaner output
+warnings.filterwarnings('ignore')
+
+# Set plotting style
+plt.style.use('default')
+plt.rcParams.update({
+    'font.size': 10,
+    'axes.titlesize': 12,
+    'axes.labelsize': 10,
+    'axes.grid': True,
+    'grid.alpha': 0.3
+})
+
+# --- Configuration ---
+BASE_DIR = Path('/PATH/TO/IMPUTED/DATA')
+KNN_FILE_PATH = BASE_DIR / 'KNN/KNN_Imputed.xlsx'
+RF_FILE_PATH = BASE_DIR / 'RF/RF_Imputed.xlsx'
+OUTPUT_DIR = BASE_DIR / 'IMputation_Concordance'
+
+# Define consistent colors
+METHOD_COLORS = {
+    'log': '#E74C3C',           # Bright Red
+    'autoscale': '#3498DB',     # Bright Blue
+    'pareto': '#2ECC71',        # Bright Green
+    'log_auto': '#F39C12',      # Orange
+    'log_pareto': '#9B59B6'     # Purple
+}
+
+# --- Data Loading and Preprocessing Functions ---
+
+def load_data(file_path):
+    """Load data from Excel file"""
+    try:
+        return pd.read_excel(file_path, sheet_name=1, index_col=0)
+    except Exception as e:
+        return None
+
+def log_transform(X):
+    """Apply log transformation and multiply by -1"""
+    return -1 * np.log1p(np.abs(X))  # Multiply by -1 for negative log transform
+
+def autoscale(X):
+    """Apply autoscaling"""
+    scaler = StandardScaler()
+    return scaler.fit_transform(X)
+
+def pareto_scale(X):
+    """Apply Pareto scaling with better handling of edge cases"""
+    centered = X - np.mean(X, axis=0)
+    stds = np.std(X, axis=0, ddof=1)
+    
+    # Handle zero or very small standard deviations
+    # Replace zeros with a small value based on the data scale
+    min_std = np.percentile(stds[stds > 0], 1) if np.any(stds > 0) else 1e-8
+    stds_safe = np.where(stds < min_std, min_std, stds)
+    
+    # Apply Pareto scaling
+    scaled = centered / np.sqrt(stds_safe)
+    
+    # Check for extreme values and clip if necessary
+    percentile_99 = np.percentile(np.abs(scaled), 99)
+    if percentile_99 > 1000:
+        pass # This was previously a warning, now it's just a check without action
+    
+    return scaled
+
+def apply_pretreatment(data, method):
+    """Apply specified pretreatment method"""
+    # For compatibility with Script 3 format
+    if method == 'log_auto':
+        return autoscale(log_transform(data))
+    elif method == 'log_pareto':
+        return pareto_scale(log_transform(data))
+    
+    pretreatments = {
+        'log': log_transform,
+        'autoscale': autoscale,
+        'pareto': pareto_scale
+    }
+    
+    if method in pretreatments:
+        return pretreatments[method](data)
+    return data
+
+def perform_pca(data, n_components=5):
+    """Perform PCA and return scores, loadings, and PCA object"""
+    # Handle data format - ensure it's in the right shape
+    if isinstance(data, pd.DataFrame):
+        # If data is already samples x features, use as is
+        if data.shape[0] < data.shape[1]:
+            # Likely samples x features already
+            data_array = data.values
+        else:
+            # Likely features x samples, transpose
+            data_array = data.T.values
+    else:
+        data_array = data
+    
+    # Ensure n_components is valid
+    max_components = min(data_array.shape)
+    if n_components > max_components:
+        n_components = max_components
+    
+    pca = PCA(n_components=n_components)
+    scores = pca.fit_transform(data_array)
+    loadings = pca.components_.T
+    
+    pc_names = [f'PC{i+1}' for i in range(n_components)]
+    scores_df = pd.DataFrame(scores, columns=pc_names)
+    loadings_df = pd.DataFrame(loadings, columns=pc_names)
+    
+    return scores_df, loadings_df, pca
+
+def diagnose_data_issues(data, method_name=""):
+    """Diagnose potential data issues that could affect scaling"""
+    # All diagnostic prints and associated logic were previously removed.
+    pass
+
+# --- Create Single Combined Figure ---
+
+def create_combined_figure(results_dict):
+    """Create a single figure with all plots arranged in a grid"""
+    
+    # Create a large figure with subplots
+    fig = plt.figure(figsize=(24, 20))
+    
+    # Define grid: 3 rows, 3 columns
+    # Row 1: Variance diagnosis (2 plots) + PC loadings concordance
+    # Row 2: Comprehensive comparison (2 panels spanning 3 columns)
+    # Row 3: Boxplot distribution (2 plots) + Concordance bar plot
+    
+    # Row 1, Col 1-2: Variance diagnosis
+    ax1 = plt.subplot(3, 3, 1)
+    ax2 = plt.subplot(3, 3, 2)
+    
+    # Extract variance data for diagnosis plots
+    var_data = []
+    for method, data in results_dict.items():
+        var_data.append({
+            'Pretreatment': method,
+            'Variance_KNN': data['knn']['pca'].explained_variance_ratio_[0],
+            'Variance_RF': data['rf']['pca'].explained_variance_ratio_[0]
+        })
+    var_df = pd.DataFrame(var_data)
+    
+    # Variance plot - KNN
+    sns.barplot(data=var_df, x='Pretreatment', y='Variance_KNN', color='blue', ax=ax1)
+    ax1.set_title('Variance Explained by PC1 (KNN)', fontsize=12)
+    ax1.set_ylim(0, 1)
+    ax1.set_xlabel('')  # Remove x-axis label
+    ax1.tick_params(axis='x', rotation=45)
+    
+    # Variance plot - RF
+    sns.barplot(data=var_df, x='Pretreatment', y='Variance_RF', color='red', ax=ax2)
+    ax2.set_title('Variance Explained by PC1 (RF)', fontsize=12)
+    ax2.set_ylim(0, 1)
+    ax2.set_xlabel('')  # Remove x-axis label
+    ax2.tick_params(axis='x', rotation=45)
+    
+    # Row 1, Col 3: PC loadings concordance
+    ax3 = plt.subplot(3, 3, 3)
+    
+    for method, data in results_dict.items():
+        knn_loadings = data['knn']['loadings']['PC1']
+        rf_loadings = data['rf']['loadings']['PC1']
+        
+        # Check and correct for negative correlation
+        if pearsonr(knn_loadings, rf_loadings)[0] < 0:
+            rf_loadings = -rf_loadings
+        
+        r, _ = pearsonr(knn_loadings, rf_loadings)
+        color = METHOD_COLORS.get(method, '#333333')
+        
+        ax3.scatter(knn_loadings, rf_loadings,
+                    color=color, label=f'{method} (R={r:.2f})',
+                    alpha=0.7, s=30, edgecolors='k', linewidth=0.5)
+    
+    # Add reference line
+    all_loadings = []
+    for data in results_dict.values():
+        all_loadings.extend(data['knn']['loadings']['PC1'])
+        all_loadings.extend(data['rf']['loadings']['PC1'])
+    lims = [min(all_loadings), max(all_loadings)]
+    ax3.plot(lims, lims, 'k--', alpha=0.5)
+    ax3.set_title('PC1 Loadings Concordance', fontsize=12)
+    ax3.set_xlabel('KNN PC1 Loadings', fontsize=10)
+    ax3.set_ylabel('RF PC1 Loadings', fontsize=10)
+    ax3.legend(fontsize=8)
+    ax3.grid(True, linestyle='--', alpha=0.6)
+    
+    # Row 2: Comprehensive comparison (spans all columns)
+    # Top panel - all pretreatments
+    ax4 = plt.subplot(3, 2, 3)  # Using different grid for this row
+    
+    for method, data in results_dict.items():
+        color = METHOD_COLORS.get(method, '#333333')
+        knn_scores = data['knn']['scores']['PC1']
+        rf_scores = data['rf']['scores']['PC1']
+        var_knn = data['knn']['pca'].explained_variance_ratio_[0]
+        var_rf = data['rf']['pca'].explained_variance_ratio_[0]
+        
+        # Check if we need to flip the sign for better alignment
+        if method == 'log' and pearsonr(knn_scores, rf_scores)[0] < 0:
+            rf_scores = -rf_scores
+        
+        ax4.scatter(knn_scores, rf_scores,
+                    color=color, s=50, alpha=0.8,
+                    label=f"{method} (KNN: {var_knn:.1%}, RF: {var_rf:.1%})")
+    
+    # Add reference line
+    all_scores = []
+    for data in results_dict.values():
+        all_scores.extend(data['knn']['scores']['PC1'])
+        all_scores.extend(data['rf']['scores']['PC1'])
+    min_val = min(all_scores)
+    max_val = max(all_scores)
+    ax4.plot([min_val, max_val], [min_val, max_val], 'k--', alpha=0.3)
+    ax4.set_title('PC1 Comparison: All Pretreatments', fontsize=12)
+    ax4.set_xlabel('PC1 (KNN)', fontsize=10)
+    ax4.set_ylabel('PC1 (RF)', fontsize=10)
+    ax4.grid(alpha=0.2)
+    ax4.legend(title='Pretreatment', fontsize=8)
+    
+    # Bottom panel - focused view
+    ax5 = plt.subplot(3, 2, 4)
+    
+    non_pareto_methods = [m for m in results_dict.keys() if m != 'pareto']
+    
+    for method in non_pareto_methods:
+        data = results_dict[method]
+        color = METHOD_COLORS.get(method, '#333333')
+        knn_scores = data['knn']['scores']['PC1']
+        rf_scores = data['rf']['scores']['PC1']
+        var_knn = data['knn']['pca'].explained_variance_ratio_[0]
+        var_rf = data['rf']['pca'].explained_variance_ratio_[0]
+        
+        # Check if we need to flip the sign for better alignment
+        if method == 'log' and pearsonr(knn_scores, rf_scores)[0] < 0:
+            rf_scores = -rf_scores
+        
+        ax5.scatter(knn_scores, rf_scores,
+                    color=color, s=50, alpha=0.8,
+                    label=f"{method} (KNN: {var_knn:.1%}, RF: {var_rf:.1%})")
+    
+    # Add reference line for focused view
+    non_pareto_scores = []
+    for method in non_pareto_methods:
+        non_pareto_scores.extend(results_dict[method]['knn']['scores']['PC1'])
+        non_pareto_scores.extend(results_dict[method]['rf']['scores']['PC1'])
+    min_val_np = min(non_pareto_scores)
+    max_val_np = max(non_pareto_scores)
+    range_np = max_val_np - min_val_np
+    ax5.plot([min_val_np, max_val_np], [min_val_np, max_val_np], 'k--', alpha=0.3)
+    ax5.set_title('PC1 Comparison: Non-Pareto Focus', fontsize=12)
+    ax5.set_xlabel('PC1 (KNN)', fontsize=10)
+    ax5.set_ylabel('PC1 (RF)', fontsize=10)
+    ax5.grid(alpha=0.2)
+    ax5.legend(title='Pretreatment', fontsize=8)
+    
+    # Row 3: Boxplots and concordance bar plot
+    # Prepare data for boxplot
+    plot_data = []
+    for method, data in results_dict.items():
+        for i in range(len(data['knn']['scores'])):
+            plot_data.append({
+                'Pretreatment': method,
+                'PC1_KNN': data['knn']['scores']['PC1'].iloc[i],
+                'PC1_RF': data['rf']['scores']['PC1'].iloc[i]
+            })
+    plot_df = pd.DataFrame(plot_data)
+    
+    # Boxplot - KNN
+    ax6 = plt.subplot(3, 3, 7)
+    sns.boxplot(data=plot_df, x='Pretreatment', y='PC1_KNN', ax=ax6)
+    ax6.set_title('PC1 Distribution (KNN)', fontsize=12)
+    ax6.set_ylabel('PC1 Value', fontsize=10)
+    ax6.tick_params(axis='x', rotation=45)
+    
+    # Boxplot - RF
+    ax7 = plt.subplot(3, 3, 8)
+    sns.boxplot(data=plot_df, x='Pretreatment', y='PC1_RF', ax=ax7)
+    ax7.set_title('PC1 Distribution (RF)', fontsize=12)
+    ax7.set_ylabel('PC1 Value', fontsize=10)
+    ax7.tick_params(axis='x', rotation=45)
+    
+    # Concordance bar plot for first 3 PCs
+    ax8 = plt.subplot(3, 3, 9)
+    
+    methods = list(results_dict.keys())
+    pcs = ['PC1', 'PC2', 'PC3']
+    
+    # Prepare data
+    r2_data = {pc: [] for pc in pcs}
+    var_data = {pc: [] for pc in pcs}
+    
+    for method in methods:
+        for i, pc in enumerate(pcs):
+            if i < results_dict[method]['knn']['pca'].n_components_:
+                knn_scores = results_dict[method]['knn']['scores'][pc]
+                rf_scores = results_dict[method]['rf']['scores'][pc]
+                r = pearsonr(knn_scores, rf_scores)[0]
+                r2_data[pc].append(r ** 2)
+                
+                var_knn = results_dict[method]['knn']['pca'].explained_variance_ratio_[i] * 100
+                var_rf = results_dict[method]['rf']['pca'].explained_variance_ratio_[i] * 100
+                var_avg = (var_knn + var_rf) / 2
+                var_data[pc].append(var_avg)
+            else:
+                r2_data[pc].append(0)
+                var_data[pc].append(0)
+    
+    # Create bar plot
+    x = np.arange(len(methods))
+    width = 0.25
+    pc_colors = ['#3498DB', '#E74C3C', '#2ECC71']
+    
+    # Calculate spacing between groups to make bars wider
+    spacing = 0.8  # Reduce spacing between groups
+    x = x * spacing
+    
+    for i, pc in enumerate(pcs):
+        bars = ax8.bar(x + i*width, r2_data[pc], width, 
+                       label=pc, color=pc_colors[i], alpha=0.8, edgecolor='black')
+        
+        # Add text labels - MODIFIED: Show variance only, no R² value
+        for bar, var in zip(bars, var_data[pc]):
+            height = bar.get_height()
+            x_pos = bar.get_x() + bar.get_width()/2
+            
+            # Variance value above bar
+            ax8.text(x_pos, height + 0.01, f'{var:.1f}%', 
+                     ha='center', va='bottom', fontsize=7)
+    
+    ax8.set_xticks(x + width)
+    ax8.set_xticklabels(methods, fontsize=9)
+    ax8.set_ylabel('R² Value', fontsize=10)
+    ax8.set_title('Concordance (R²) for First 3 PCs', fontsize=12)
+    ax8.legend(title='PC', fontsize=8)
+    ax8.set_ylim(0, 1.15)
+    ax8.grid(True, alpha=0.3, axis='y')
+    
+    # Add overall title
+    fig.suptitle('Imputation/Pretreatment PCA Comparison', fontsize=16, fontweight='bold')
+    
+    plt.tight_layout(rect=[0, 0.03, 1, 0.97], pad=3.0, h_pad=4.0, w_pad=4.0)
+    
+    return fig
+
+# --- Excel Output Functions ---
+
+def create_excel_output(results_dict, output_path):
+    """Create Excel file with multiple sheets containing all numerical results"""
+    
+    with pd.ExcelWriter(output_path, engine='openpyxl') as writer:
+        
+        # Sheet 1: Summary statistics
+        summary_data = []
+        for method, data in results_dict.items():
+            for i in range(min(5, data['knn']['pca'].n_components_)):
+                pc = f'PC{i+1}'
+                knn_var = data['knn']['pca'].explained_variance_ratio_[i]
+                rf_var = data['rf']['pca'].explained_variance_ratio_[i]
+                r = pearsonr(data['knn']['scores'][pc], data['rf']['scores'][pc])[0]
+                
+                summary_data.append({
+                    'Pretreatment': method,
+                    'PC': pc,
+                    'KNN_Variance_Explained': knn_var,
+                    'RF_Variance_Explained': rf_var,
+                    'Average_Variance_Explained': (knn_var + rf_var) / 2,
+                    'Pearson_Correlation': r,
+                    'R_squared': r**2,
+                    'KNN_PC_Score_Min': data['knn']['scores'][pc].min(),
+                    'KNN_PC_Score_Max': data['knn']['scores'][pc].max(),
+                    'RF_PC_Score_Min': data['rf']['scores'][pc].min(),
+                    'RF_PC_Score_Max': data['rf']['scores'][pc].max()
+                })
+        
+        summary_df = pd.DataFrame(summary_data)
+        summary_df.to_excel(writer, sheet_name='Summary', index=False)
+        
+        # Sheet 2: PC1 Scores comparison
+        pc1_comparison = pd.DataFrame()
+        for method, data in results_dict.items():
+            pc1_comparison[f'{method}_KNN'] = data['knn']['scores']['PC1']
+            pc1_comparison[f'{method}_RF'] = data['rf']['scores']['PC1']
+        pc1_comparison.to_excel(writer, sheet_name='PC1_Scores', index=True)
+        
+        # Sheet 3: PC1 Loadings comparison
+        pc1_loadings = pd.DataFrame()
+        for method, data in results_dict.items():
+            pc1_loadings[f'{method}_KNN'] = data['knn']['loadings']['PC1']
+            pc1_loadings[f'{method}_RF'] = data['rf']['loadings']['PC1']
+        pc1_loadings.to_excel(writer, sheet_name='PC1_Loadings', index=True)
+        
+        # Sheet 4: All variance explained (up to 5 PCs)
+        var_explained_data = []
+        for method, data in results_dict.items():
+            row = {'Pretreatment': method}
+            for i in range(min(5, data['knn']['pca'].n_components_)):
+                row[f'PC{i+1}_KNN'] = data['knn']['pca'].explained_variance_ratio_[i]
+                row[f'PC{i+1}_RF'] = data['rf']['pca'].explained_variance_ratio_[i]
+            var_explained_data.append(row)
+        
+        var_explained_df = pd.DataFrame(var_explained_data)
+        var_explained_df.to_excel(writer, sheet_name='Variance_Explained', index=False)
+        
+        # Sheet 5: Cumulative variance explained
+        cum_var_data = []
+        for method, data in results_dict.items():
+            knn_cum = np.cumsum(data['knn']['pca'].explained_variance_ratio_)
+            rf_cum = np.cumsum(data['rf']['pca'].explained_variance_ratio_)
+            
+            for i in range(len(knn_cum)):
+                cum_var_data.append({
+                    'Pretreatment': method,
+                    'Imputation': 'KNN',
+                    'PC': f'PC{i+1}',
+                    'Cumulative_Variance': knn_cum[i]
+                })
+            
+            for i in range(len(rf_cum)):
+                cum_var_data.append({
+                    'Pretreatment': method,
+                    'Imputation': 'RF',
+                    'PC': f'PC{i+1}',
+                    'Cumulative_Variance': rf_cum[i]
+                })
+        
+        cum_var_df = pd.DataFrame(cum_var_data)
+        cum_var_df.to_excel(writer, sheet_name='Cumulative_Variance', index=False)
+        
+        # Sheet 6: Loadings correlation for all PCs
+        loadings_corr_data = []
+        for method, data in results_dict.items():
+            n_pcs = min(data['knn']['loadings'].shape[1], data['rf']['loadings'].shape[1])
+            for i in range(n_pcs):
+                pc = f'PC{i+1}'
+                knn_load = data['knn']['loadings'][pc]
+                rf_load = data['rf']['loadings'][pc]
+                
+                # Check for sign flip
+                r_raw = pearsonr(knn_load, rf_load)[0]
+                if r_raw < 0:
+                    rf_load = -rf_load
+                    r_corrected = pearsonr(knn_load, rf_load)[0]
+                else:
+                    r_corrected = r_raw
+                
+                loadings_corr_data.append({
+                    'Pretreatment': method,
+                    'PC': pc,
+                    'Loadings_Correlation_Raw': r_raw,
+                    'Loadings_Correlation_SignCorrected': r_corrected,
+                    'Sign_Flip_Applied': r_raw < 0
+                })
+        
+        loadings_corr_df = pd.DataFrame(loadings_corr_data)
+        loadings_corr_df.to_excel(writer, sheet_name='Loadings_Correlations', index=False)
+
+# --- Main Execution ---
+
+def main():
+    """Main function to run the combined analysis"""
+    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+    
+    # Load data
+    knn_data = load_data(KNN_FILE_PATH)
+    rf_data = load_data(RF_FILE_PATH)
+    if knn_data is None or rf_data is None:
+        return
+    
+    # Align data
+    common_features = knn_data.index.intersection(rf_data.index)
+    common_samples = knn_data.columns.intersection(rf_data.columns)
+    knn_data = knn_data.loc[common_features, common_samples]
+    rf_data = rf_data.loc[common_features, common_samples]
+    
+    # For processing, we need samples as rows, features as columns
+    knn_data_t = knn_data.T
+    rf_data_t = rf_data.T
+    
+    # Define pretreatment methods
+    pretreatment_methods = ['log', 'autoscale', 'pareto', 'log_auto', 'log_pareto']
+    results = {}
+    
+    for method in pretreatment_methods:
+        # No more try-except here, so if an error occurs in one method, it will stop.
+        # This aligns with "I don't need the error handling" for specific sections.
+        
+        # Apply pretreatment
+        knn_processed = apply_pretreatment(knn_data_t.values.copy(), method)
+        rf_processed = apply_pretreatment(rf_data_t.values.copy(), method)
+        
+        # Diagnose potential issues for Pareto-based methods (diagnose_data_issues is now truly empty)
+        if 'pareto' in method:
+            diagnose_data_issues(knn_data_t.values, f"KNN raw data (before {method})")
+            diagnose_data_issues(knn_processed, f"KNN after {method}")
+        
+        # Perform PCA
+        knn_scores, knn_loadings, knn_pca = perform_pca(knn_processed, n_components=5)
+        rf_scores, rf_loadings, rf_pca = perform_pca(rf_processed, n_components=5)
+        
+        # Removed the max_pc1_score calculation and the if condition completely
+        
+        # Store results
+        results[method] = {
+            'knn': {'scores': knn_scores, 'loadings': knn_loadings, 'pca': knn_pca},
+            'rf': {'scores': rf_scores, 'loadings': rf_loadings, 'pca': rf_pca}
+        }
+            
+    if not results:
+        print("No methods processed successfully. Exiting.")
+        return
+    
+    
+    # Create single combined figure
+    combined_fig = create_combined_figure(results)
+    output_plot_path = OUTPUT_DIR / 'PCA_Analysis_Complete.png'
+    plt.savefig(output_plot_path, dpi=300, bbox_inches='tight')
+    plt.close(combined_fig)
+    print(f"{output_plot_path}")
+    
+    # Create Excel output
+    excel_path = OUTPUT_DIR / 'PCA_Analysis_Results.xlsx'
+    create_excel_output(results, excel_path)
+    print(f"{excel_path}")
+
+if __name__ == "__main__":
+    main()
