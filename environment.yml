@@ -1,4 +1,4 @@
-name: MSc_original
+name: MSc_AranPurdy
 channels:
   - conda-forge
   - defaults
@@ -280,4 +280,4 @@ dependencies:
     - xlsxwriter==3.2.3
     - xmltodict==0.14.2
     - yarl==1.20.1
-prefix: /Users/aranpurdy/opt/anaconda3/envs/MSc_original
+prefix: /Users/aranpurdy/opt/anaconda3/envs/MSc_AranPurdy
