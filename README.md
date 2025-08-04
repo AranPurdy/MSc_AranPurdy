@@ -26,9 +26,9 @@ The scripts are intended to be used as follows:
 
 ## Pathway mapping 
 
-##PCA 
+## PCA 
 - timepoint-specific
 - PCA of mapped metabolites
 
-##Metabolite trajectory 
+## Metabolite trajectory 
 
