@@ -7,7 +7,7 @@ To run this project, you will need to have [Conda](https://www.anaconda.com/prod
 
 1.  **Clone the repository:**
     ```bash
-    git clone [(https://github.com/AranPurdy/MSc_AranPurdy.git)
+    git clone https://github.com/AranPurdy/MSc_AranPurdy.git
     cd your-repo-name
     ```
 
