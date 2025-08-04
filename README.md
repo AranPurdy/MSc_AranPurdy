@@ -39,7 +39,7 @@ The scripts are intended to be used as follows:
 
 5. Generate artificial missingness patterns (Generate_missingness): Will introduce MAR/MNAR/MCAR patterns to the manually imputed data, generating three output files: mcar_data.xlsx, mnar_data.xlsx, mar_data.xlsx
 
-6. Use Imputomics website to impute the previously generated data files (mcar_data.xlsx, mnar_data.xlsx, mar_data.xlsx) according to their "5 most accurate methods for MCAR/MNAR/MAR" to produce three imputed data files, each with 5 sheets for each imputation algorithm. These should all be saved to the same directory.
+6. Use Imputomics website (https://imputomics.umb.edu.pl/) to impute the previously generated data files (mcar_data.xlsx, mnar_data.xlsx, mar_data.xlsx) according to their "5 most accurate methods for MCAR/MNAR/MAR" to produce three imputed data files, each with 5 sheets for each imputation algorithm. These should all be saved to the same directory.
 
 7. Assess the performance of the imputations (MVIA_Test): This script uses the ground truth data from step 4 (Manual_Impute), artificial missingness pattern data from step 5 (Generate_Missingness), and imputomics results from step 6 to compare imputations using NMRSE, MAE, and biological validity (number of negative values).
 
