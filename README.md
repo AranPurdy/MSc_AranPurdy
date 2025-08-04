@@ -7,7 +7,7 @@ To run this project, you will need to have [Conda](https://www.anaconda.com/prod
 
 1.  **Clone the repository:**
     ```bash
-    git clone [https://github.com/your-username/your-repo-name.git](https://github.com/your-username/your-repo-name.git)
+    git clone [https://github.com/your-username/your-repo-name.git](https://github.com/your-username/your-repo-name.git](https://github.com/AranPurdy/MSc_AranPurdy.git)
     cd your-repo-name
     ```
 
@@ -18,7 +18,7 @@ To run this project, you will need to have [Conda](https://www.anaconda.com/prod
     conda env create -f environment.yml
 
     # Activate the environment
-    conda activate dissertation_env
+    conda activate Msc_Aranpurdy
     ```
 
 3.  **Launch Jupyter Notebook:**
