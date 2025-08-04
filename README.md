@@ -43,7 +43,7 @@ The scripts are intended to be used as follows:
 
 7. Based on the User's missing data pattern, they should select the imputation with lowest NMRSE, MAE, and fewest (ideally 0) negative values for further analysis. 
 
-8. To compare two high-performing imputations and to inform data pretreatment approach **(Imputation_Concordance)**: Extract the sheets for two imputations and create two new excel files (KNN and RF are used here) (eg. KNN_Imputed.xlsx and RF_Imputed.xlsx) Applies log transform, pareto scale, autoscale, log+pareto, log+auto. Quantifies the similarity of PC scores and loadings between imputations across pretreatments using Pearson correlation and R-squared values. Displays plots showing variance explained of first 3 PCs across pretreatments.  
+8. To compare two high-performing imputations and to inform data pretreatment approach **(Imputation_Concordance)**: Extract the sheets for two imputations and create two new excel files (KNN and RF are used here: eg. KNN_Imputed.xlsx and RF_Imputed.xlsx) Applies log transform, pareto scale, autoscale, log+pareto, log+auto. Quantifies the similarity of PC scores and loadings between imputations across pretreatments using Pearson correlation and R-squared values. Displays plots showing variance explained of first 3 PCs across pretreatments.  
 
 **By this point, the User will have selected an imputation and pretreatment that best suits their data**
 
