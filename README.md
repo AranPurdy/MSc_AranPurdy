@@ -23,3 +23,12 @@ The scripts are intended to be used as follows:
 9. To compare two high-performing imputations and to inform data pretreatment appraoch, use Imputation_Concordance (KNN and RF are used here): Applies log transform, pareto scale, autoscale, log+pareto, log+auto. Quantifies the similarity of PC scores and loadings between KNN and RF imputations across pretreatments using Pearson correlation and R-squared values. Displays plots showing variance explained of first 3 PCs across pretreatments.  
 
 **By this point, the User will have selected an imputation and pretreatment that best suits their data**
+
+## Pathway mapping 
+
+##PCA 
+- timepoint-specific
+- PCA of mapped metabolites
+
+##Metabolite trajectory 
+
