@@ -29,13 +29,13 @@ To run this project, you will need to have [Conda](https://www.anaconda.com/prod
 The scripts are intended to be used as follows: 
 
 # Missing Data Analysis and imputation
-1. Apply thresholding to datafile (Missing_Thresholds) to produce multiple outputs with varying levels of missingness with associated figures. Select one threshold for further analysis based on optimal signal:noise for your data.
+1. Apply thresholding to datafile (Missing_Thresholds.ipynb) to produce multiple outputs with varying levels of missingness with associated figures. Select one threshold for further analysis based on optimal signal:noise for your data.
 
-2. Apply Little's MCAR test (Little_MCAR_Test): This should be done in parallel with other methods (missing data histogram from Missing_Thresholds / Imputomics missing data heatmap) to determine missing data patterns.
+2. Apply Little's MCAR test (Little_MCAR_Test.ipynb): This should be done in parallel with other methods (missing data histogram from Missing_Thresholds / Imputomics missing data heatmap) to determine missing data patterns.
 
-3. Convert missing values to NaN (NaN_Conversion): Many libraries like Pandas and NumPy use NaN for missing values.
+3. Convert missing values to NaN (NaN_Conversion.ipynb): Many libraries like Pandas and NumPy use NaN for missing values.
 
-4. Manually impute the data (Manual_Impute): Use a subset of the data with low missing % to perform a simple imputation (mean per replicate group) this will be used to compare MVIAs (Missing Value Imputation Algorithms) against this "ground truth" data. T=0 is removed due to high missingness rate (some replicate groups have 5/5 missing values).
+4. Manually impute the data (Manual_Impute.ipynb): Use a subset of the data with low missing % to perform a simple imputation (mean per replicate group) this will be used to compare MVIAs (Missing Value Imputation Algorithms) against this "ground truth" data. T=0 is removed due to high missingness rate (some replicate groups have 5/5 missing values).
 
 5. Generate artificial missingness patterns (Generate_missingness): Will introduce MAR/MNAR/MCAR patterns to the manually imputed data, generating three output files: mcar_data.xlsx, mnar_data.xlsx, mar_data.xlsx
 
