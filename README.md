@@ -8,6 +8,8 @@ To run this project, you will need to have [Conda](https://www.anaconda.com/prod
 1.  **Clone the repository:**
     ```bash
     git clone https://github.com/AranPurdy/MSc_AranPurdy.git
+    ```
+    ```bash
     cd MSc_AranPurdy
     ```
 
@@ -16,7 +18,8 @@ To run this project, you will need to have [Conda](https://www.anaconda.com/prod
     ```bash
     # Create the conda environment
     conda env create -f environment.yml
-
+    ```
+    ```bash
     # Activate the environment
     conda activate Msc_AranPurdy
     ```
