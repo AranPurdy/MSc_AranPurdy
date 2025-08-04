@@ -1,4 +1,4 @@
-name: MSc
+name: MSc_original
 channels:
   - conda-forge
   - defaults
@@ -236,7 +236,7 @@ dependencies:
     - multidict==6.6.3
     - mygene==3.2.2
     - namex==0.0.8
-    - numpy==2.0.2
+    - numpy==1.26.4
     - opt-einsum==3.4.0
     - optree==0.14.1
     - packaging==25.0
@@ -280,4 +280,4 @@ dependencies:
     - xlsxwriter==3.2.3
     - xmltodict==0.14.2
     - yarl==1.20.1
-prefix: /Users/aranpurdy/opt/anaconda3/envs/MSc
+prefix: /Users/aranpurdy/opt/anaconda3/envs/MSc_original
