@@ -16,11 +16,9 @@ To run this project, you will need to have [Conda](https://www.anaconda.com/prod
 2.  **Create and activate the Conda environment:**
     The provided `environment.yml` file contains all necessary dependencies.
     ```bash
-    # Create the conda environment
     conda env create -f environment.yml
     ```
     ```bash
-    # Activate the environment
     conda activate Msc_AranPurdy
     ```
 
