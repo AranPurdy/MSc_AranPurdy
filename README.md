@@ -5,6 +5,27 @@ Each script is intended to be executed within a single cell within Jupyter Noteb
 ## Conda 
 To run this project, you will need to have [Conda](https://www.anaconda.com/products/distribution) installed on your system.
 
+1.  **Clone the repository:**
+    ```bash
+    git clone [https://github.com/your-username/your-repo-name.git](https://github.com/your-username/your-repo-name.git)
+    cd your-repo-name
+    ```
+
+2.  **Create and activate the Conda environment:**
+    The provided `environment.yml` file contains all necessary dependencies.
+    ```bash
+    # Create the conda environment
+    conda env create -f environment.yml
+
+    # Activate the environment
+    conda activate dissertation_env
+    ```
+
+3.  **Launch Jupyter Notebook:**
+    ```bash
+    jupyter notebook
+    ```
+
 The scripts are intended to be used as follows: 
 
 # Missing Data Analysis and imputation
