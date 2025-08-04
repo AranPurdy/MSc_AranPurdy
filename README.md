@@ -4,6 +4,8 @@ Each script is intended to be executed within a single cell within Jupyter Noteb
 
 
 The scripts are intended to be used as follows: 
+
+# Missing Data Analysis and imputation
 1. Apply thresholding to datafile (Missing_Thresholds) to produce multiple outputs with varying levels of missingness with associated figures. Select one threshold for further analysis based on optimal signal:noise for your data.
 
 2. Apply Little's MCAR test (Little_MCAR_Test): This should be done in parallel with other methods (missing data histogram from Missing_Thresholds / Imputomics missing data heatmap) to determine missing data patterns.
