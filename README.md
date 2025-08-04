@@ -18,7 +18,7 @@ To run this project, you will need to have [Conda](https://www.anaconda.com/prod
     conda env create -f environment.yml
 
     # Activate the environment
-    conda activate Msc_Aranpurdy
+    conda activate Msc_AranPurdy
     ```
 
 3.  **Launch Jupyter Notebook:**
