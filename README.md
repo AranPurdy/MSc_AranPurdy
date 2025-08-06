@@ -57,7 +57,11 @@ Use **PCA.ipynb**
 1. Includes mutliple pretreatment options (pareto scale, autoscale, log transform, log+pareto, log+auto) in configurations 
 2. Full timecourse PCA with associated scree plot, biplot, loadings plot
 3. Timepoint-specific PCA with associated scree, biplot, loadings plot
-4. (Optional) Include pathway mapping file in configurations to see which pathways are most represented among the unique metabolites in top 20 PC1 and PC2 loadings 
+4. (Optional) Include pathway mapping file in configurations to see which pathways are most represented among the unique metabolites in top 20 PC1 and PC2 loadings
+
+## PLS-DA 
+Use **PLS-DA.ipynb** 
+1. Includes loadings plot, score plot, and VIP score plot 
 
 ## Metabolite trajectory 
 Use **Metabolite_Trajectory.ipynb 
