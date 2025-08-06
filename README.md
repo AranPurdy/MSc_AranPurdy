@@ -60,6 +60,7 @@ Use **PCA.ipynb**
 4. (Optional) Include pathway mapping file in configurations to see which pathways are most represented among the unique metabolites in top 20 PC1 and PC2 loadings
 
 ## Pathway-specific PCA 
+Use **Path_PCA.ipynb**
 1. performs PCA only on subset metabolites within selected pathways
 2. Inlcudes associated scree plots, biplots, loadings plot
 
