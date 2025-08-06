@@ -69,6 +69,6 @@ Use **PLS-DA.ipynb**
 1. Includes loadings plot, score plot, and VIP score plot 
 
 ## Metabolite trajectory 
-Use **Metabolite_Trajectory.ipynb 
+Use **Metabolite_Trajectory.ipynb**
 1. Inputs imputed data, pathway mapping file and returns timecourse plots of metabolites within specified pathways (See configurations)
 
