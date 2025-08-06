@@ -39,6 +39,7 @@ The scripts are intended to be used as follows:
 4. Generate artificial missingness patterns **(Generate_missingness)**: Will introduce MAR/MNAR/MCAR patterns to the manually imputed data, generating three output files: mcar_data.xlsx, mnar_data.xlsx, mar_data.xlsx
 
 5. Use Imputomics website (https://imputomics.umb.edu.pl/) to impute the previously generated data files (mcar_data.xlsx, mnar_data.xlsx, mar_data.xlsx) according to their "5 most accurate methods for MCAR/MNAR/MAR" to produce three imputed data files, each with 5 sheets for each imputation algorithm. These should all be saved to the same directory.
+- Imputomics also includes heatmaps of missing data: Consider removing problematic replicates with extremely high missing values 
 
 6. Assess the performance of the imputations **(MVIA_Test)**: This script uses the ground truth data from step 3 (Manual_Impute), artificial missingness pattern data from step 4 (Generate_Missingness), and imputomics results from step 6 to compare imputations using NMRSE, MAE, and biological validity (number of negative values).
 
@@ -59,4 +60,6 @@ Use **PCA.ipynb**
 4. (Optional) Include pathway mapping file in configurations to see which pathways are most represented among the unique metabolites in top 20 PC1 and PC2 loadings 
 
 ## Metabolite trajectory 
+Use **Metabolite_Trajectory.ipynb 
+1. Inputs imputed data, pathway mapping file and returns timecourse plots of metabolites within specified pathways 
 
