@@ -52,8 +52,11 @@ The scripts are intended to be used as follows:
 - Use **Pathway_Mapping.ipynb**: This script maps a list of metabolites to relevant pathways. **NOTE** This script is not perfect and pathway mapping should ideally be supplemented with additional methods such as MetaboAnalyst or PathBank (https://www.metaboanalyst.ca/ https://pathbank.org/) or a manual approach mapping metabolites to central pathways (eg. nucleotide metabolism, amino acid metabolism, TCA cycle, glycolysis/gluconeogenesis) 
 
 ## PCA 
-- timepoint-specific
-- PCA of mapped metabolites
+**PCA.ipynb**
+- Includes mutliple pretreatment options (pareto scale, autoscale, log transform, log+pareto, log+auto) in configurations 
+1. Full timecourse PCA with associated scree plot, biplot, loadings plot
+2. Timepoint-specific PCA with associated scree, biplot, loadings plot
+3. (Optional) Include pathway mapping file in configurations to see which pathways are most among the unique metabolites in top 20 PC1 and PC2 loadings 
 
 ## Metabolite trajectory 
 
