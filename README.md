@@ -49,6 +49,7 @@ The scripts are intended to be used as follows:
 **By this point, the User will have selected an imputation and pretreatment that best suits their data**
 
 ## Pathway mapping 
+- Use **Pathway_Mapping.ipynb**: This script maps a list of metabolites to relevant pathways. **NOTE** This script is not perfect and pathway mapping should ideally be supplemented with additional methods such as MetaboAnalyst or PathBank (https://www.metaboanalyst.ca/ https://pathbank.org/) or a manual approach mapping metabolites to central pathways (eg. nucleotide metabolism, amino acid metabolism, TCA cycle, glycolysis/gluconeogenesis) 
 
 ## PCA 
 - timepoint-specific
