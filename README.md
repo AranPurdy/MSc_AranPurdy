@@ -49,6 +49,9 @@ The scripts are intended to be used as follows:
 
 **By this point, the User will have selected an imputation and pretreatment that best suits their data**
 
+9. To compare concordance between thresholds **(Threshold_Test.ipynb)**: This script compares top PC1 and PC2 metabolite loadings across three thresholds in the form of a heatmap
+10. GFP Kinetics **(GFP_Kinetics.ipynb)**: From GFP kinetics file, user will select two replicate columns and plot GFP kinetics over time 
+
 ## Pathway mapping 
 - Use **Pathway_Mapping.ipynb**: This script maps a list of metabolites to relevant pathways. **NOTE** This script is not perfect and pathway mapping should ideally be supplemented with additional methods such as MetaboAnalyst or PathBank (https://www.metaboanalyst.ca/ https://pathbank.org/) or a manual approach mapping metabolites to central pathways (eg. nucleotide metabolism, amino acid metabolism, TCA cycle, glycolysis/gluconeogenesis) 
 
