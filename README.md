@@ -1,4 +1,4 @@
-# MSc_B269728
+# MSc_AranPurdy
 This repository contains the various scripts used in the MSc Dissertation "Uncovering the Limitations of Cell-free Protein Synthesis Through Metabolomic Analysis"
 Each script is intended to be executed within Jupyter Notebooks
 
@@ -10,7 +10,7 @@ To run this project, you will need to have [Conda](https://www.anaconda.com/prod
     git clone https://github.com/AranPurdy/MSc_AranPurdy.git
     ```
     ```bash
-    cd MSc_B269728
+    cd MSc_AranPurdy
     ```
 
 2.  **Create and activate the Conda environment:**
